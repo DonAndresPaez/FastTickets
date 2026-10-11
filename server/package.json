@@ -1,9 +1,17 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "FastTickets API server (Node.js + Express + PostgreSQL)",
+  "main": "dist/index.js",
   "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "db:create": "tsx src/scripts/db-create.ts",
+    "db:migrate": "tsx src/scripts/migrate.ts",
+    "db:setup": "npm run db:create && npm run db:migrate",
+    "db:reset": "tsx src/scripts/db-reset.ts && npm run db:migrate",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -20,7 +28,8 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^22.20.2",
-    "ts-node-dev": "^2.0.0",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }
 }
