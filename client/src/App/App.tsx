@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, type SubmitEvent } from 'react'
+import { http, getErrorMessage } from '../api/http'
 import './App.css'
 
 function App() {
@@ -8,6 +9,44 @@ function App() {
   const [password, setPassword] = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const switchTab = (tab: 'login' | 'signup') => {
+    setActiveTab(tab)
+    setError('')
+  }
+
+  const handleSignup = async (e: SubmitEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const { data } = await http.post('/auth/signup', { firstName, lastName, email, password })
+      console.log('Signed up:', data.user)
+      setPassword('')
+      setActiveTab('login')
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleLogin = async (e: SubmitEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const { data } = await http.post('/auth/login', { email, password })
+      console.log('Logged in:', data.user)
+      // TODO: store the user/session and navigate
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[#f3f3f3] text-zinc-900 flex flex-col justify-between font-sans">
@@ -20,7 +59,7 @@ function App() {
 
         <nav className="bg-[#2d2d37] flex justify-center text-sm font-semibold">
           <button
-            onClick={() => setActiveTab('login')}
+            onClick={() => switchTab('login')}
             className={`py-3 px-8 transition-colors border-b-4 ${
               activeTab === 'login'
                 ? 'text-white border-[#e10600] bg-[#383844]'
@@ -30,7 +69,7 @@ function App() {
             Login
           </button>
           <button
-            onClick={() => setActiveTab('signup')}
+            onClick={() => switchTab('signup')}
             className={`py-3 px-8 transition-colors border-b-4 ${
               activeTab === 'signup'
                 ? 'text-white border-[#e10600] bg-[#383844]'
@@ -47,7 +86,7 @@ function App() {
               <h1 className="text-3xl font-extrabold uppercase tracking-wide text-zinc-900">LOGIN</h1>
               <hr className="border-zinc-300" />
 
-              <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
+              <form onSubmit={handleLogin} className="space-y-6">
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-zinc-700">Email address</label>
                   <input
@@ -88,23 +127,30 @@ function App() {
                     </button>
                   </div>
                 </div>
+
+                {error && (
+                  <p role="alert" className="text-sm font-medium text-red-600">
+                    {error}
+                  </p>
+                )}
+
                 <div>
                   <button
                     type="submit"
-                    className="bg-[#e10600] hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded text-sm uppercase tracking-wider transition-colors"
+                    disabled={loading}
+                    className="bg-[#e10600] hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded text-sm uppercase tracking-wider transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    LOGIN
+                    {loading ? 'Logging in...' : 'LOGIN'}
                   </button>
                 </div>
               </form>
-
             </div>
           ) : (
             <div className="space-y-6">
               <h1 className="text-3xl font-extrabold uppercase tracking-wide text-zinc-900">SIGN UP</h1>
               <hr className="border-zinc-300" />
 
-              <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
+              <form onSubmit={handleSignup} className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-zinc-700">First name</label>
@@ -169,12 +215,19 @@ function App() {
                   </div>
                 </div>
 
+                {error && (
+                  <p role="alert" className="text-sm font-medium text-red-600">
+                    {error}
+                  </p>
+                )}
+
                 <div>
                   <button
                     type="submit"
-                    className="bg-[#e10600] hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded text-sm uppercase tracking-wider transition-colors"
+                    disabled={loading}
+                    className="bg-[#e10600] hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded text-sm uppercase tracking-wider transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    Sign Up
+                    {loading ? 'Creating account...' : 'Sign Up'}
                   </button>
                 </div>
               </form>
