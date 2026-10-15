@@ -1,6 +1,8 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
+import { clearSessionCookie, setSessionCookie } from "../auth/session";
 import { query } from "../db";
+import { requireAuth } from "../middleware/requireAuth";
 
 export const authRouter = Router();
 
@@ -70,9 +72,36 @@ authRouter.post("/login", async (req, res, next) => {
       return;
     }
 
+    setSessionCookie(res, user.id);
     res.json({
       user: { id: user.id, firstName: user.first_name, lastName: user.last_name, email: user.email },
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+authRouter.post("/logout", (_req, res) => {
+  clearSessionCookie(res);
+  res.status(204).end();
+});
+
+authRouter.get("/me", requireAuth, async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT id, first_name AS "firstName", last_name AS "lastName", email
+       FROM users
+       WHERE id = $1`,
+      [req.user!.id],
+    );
+
+    if (!rows[0]) {
+      clearSessionCookie(res);
+      res.status(401).json({ error: "Not logged in" });
+      return;
+    }
+
+    res.json({ user: rows[0] });
   } catch (err) {
     next(err);
   }

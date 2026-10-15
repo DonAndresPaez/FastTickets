@@ -1,3 +1,4 @@
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import express, { type ErrorRequestHandler } from "express";
 import { env } from "./config/env";
@@ -9,6 +10,7 @@ export function createApp(): express.Express {
 
   app.use(cors({ origin: env.clientOrigin }));
   app.use(express.json());
+  app.use(cookieParser()); // fills req.cookies, needed by requireAuth
 
   // add each subsystem's routes here, e.g. app.use("/api/auth", authRouter);
   app.use("/api/health", healthRouter);

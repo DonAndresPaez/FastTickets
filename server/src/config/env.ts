@@ -21,10 +21,13 @@ function readPort(name: string, fallback: number): number {
   return value;
 }
 
+const nodeEnv = readString("NODE_ENV", "development");
+
 export const env = {
-  nodeEnv: readString("NODE_ENV", "development"),
+  nodeEnv,
   port: readPort("PORT", 4000),
   clientOrigin: readString("CLIENT_ORIGIN", "http://localhost:5173"),
+  jwtSecret: readString("JWT_SECRET", nodeEnv === "production" ? undefined : "dev-only-insecure-secret"),
   db: {
     url: process.env.DATABASE_URL?.trim() || undefined, // if set, used instead of the PG* values
     host: readString("PGHOST", "localhost"),

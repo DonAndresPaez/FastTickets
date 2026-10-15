@@ -1,8 +1,17 @@
-import { useState, type SubmitEvent } from 'react'
+import { useEffect, useState, type SubmitEvent } from 'react'
 import { http, getErrorMessage } from '../api/http'
 import './App.css'
 
+interface User {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+}
+
 function App() {
+  const [user, setUser] = useState<User | null>(null)
+  const [checkingSession, setCheckingSession] = useState(true)
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login')
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState('')
@@ -11,6 +20,21 @@ function App() {
   const [lastName, setLastName] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // page load
+  useEffect(() => {
+    http
+      .get('/auth/me')
+      .then(({ data }) => setUser(data.user))
+      .catch(() => setUser(null))
+      .finally(() => setCheckingSession(false))
+  }, [])
+
+  const handleLogout = async () => {
+    await http.post('/auth/logout').catch(() => undefined)
+    setUser(null)
+    setPassword('')
+  }
 
   const switchTab = (tab: 'login' | 'signup') => {
     setActiveTab(tab)
@@ -39,8 +63,8 @@ function App() {
     setLoading(true)
     try {
       const { data } = await http.post('/auth/login', { email, password })
-      console.log('Logged in:', data.user)
-      // TODO: store the user/session and navigate
+      setUser(data.user)
+      setPassword('')
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -57,31 +81,47 @@ function App() {
           </div>
         </header>
 
-        <nav className="bg-[#2d2d37] flex justify-center text-sm font-semibold">
-          <button
-            onClick={() => switchTab('login')}
-            className={`py-3 px-8 transition-colors border-b-4 ${
-              activeTab === 'login'
-                ? 'text-white border-[#e10600] bg-[#383844]'
-                : 'text-zinc-400 border-transparent hover:text-white'
-            }`}
-          >
-            Login
-          </button>
-          <button
-            onClick={() => switchTab('signup')}
-            className={`py-3 px-8 transition-colors border-b-4 ${
-              activeTab === 'signup'
-                ? 'text-white border-[#e10600] bg-[#383844]'
-                : 'text-zinc-400 border-transparent hover:text-white'
-            }`}
-          >
-            Sign Up
-          </button>
-        </nav>
+        {!user && (
+          <nav className="bg-[#2d2d37] flex justify-center text-sm font-semibold">
+            <button
+              onClick={() => switchTab('login')}
+              className={`py-3 px-8 transition-colors border-b-4 ${
+                activeTab === 'login'
+                  ? 'text-white border-[#e10600] bg-[#383844]'
+                  : 'text-zinc-400 border-transparent hover:text-white'
+              }`}
+            >
+              Login
+            </button>
+            <button
+              onClick={() => switchTab('signup')}
+              className={`py-3 px-8 transition-colors border-b-4 ${
+                activeTab === 'signup'
+                  ? 'text-white border-[#e10600] bg-[#383844]'
+                  : 'text-zinc-400 border-transparent hover:text-white'
+              }`}
+            >
+              Sign Up
+            </button>
+          </nav>
+        )}
 
         <main className="max-w-xl mx-auto px-6 py-12">
-          {activeTab === 'login' ? (
+          {checkingSession ? null : user ? (
+            <div className="space-y-6">
+              <h1 className="text-3xl font-extrabold uppercase tracking-wide text-zinc-900">
+                Welcome, {user.firstName}
+              </h1>
+              <hr className="border-zinc-300" />
+              <p className="text-sm text-zinc-700">Signed in as {user.email}</p>
+              <button
+                onClick={handleLogout}
+                className="bg-[#e10600] hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded text-sm uppercase tracking-wider transition-colors"
+              >
+                Log out
+              </button>
+            </div>
+          ) : activeTab === 'login' ? (
             <div className="space-y-6">
               <h1 className="text-3xl font-extrabold uppercase tracking-wide text-zinc-900">LOGIN</h1>
               <hr className="border-zinc-300" />
