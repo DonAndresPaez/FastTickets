@@ -20,6 +20,10 @@ function App() {
   const [lastName, setLastName] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  // set once the password is accepted and a code has been emailed
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null)
+  const [code, setCode] = useState('')
+  const [notice, setNotice] = useState('')
 
   // page load
   useEffect(() => {
@@ -41,15 +45,55 @@ function App() {
     setError('')
   }
 
+  const startVerification = (sentTo: string) => {
+    setPendingEmail(sentTo)
+    setPassword('')
+    setCode('')
+    setNotice('')
+  }
+
+  const cancelVerification = () => {
+    setPendingEmail(null)
+    setError('')
+    setNotice('')
+  }
+
+  const handleVerify = async (e: SubmitEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setError('')
+    setNotice('')
+    setLoading(true)
+    try {
+      const { data } = await http.post('/auth/verify', { code })
+      setUser(data.user)
+      setPendingEmail(null)
+      setCode('')
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResend = async () => {
+    setError('')
+    setNotice('')
+    try {
+      await http.post('/auth/resend-code')
+      setCode('')
+      setNotice('A new code is on its way')
+    } catch (err) {
+      setError(getErrorMessage(err))
+    }
+  }
+
   const handleSignup = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
       const { data } = await http.post('/auth/signup', { firstName, lastName, email, password })
-      console.log('Signed up:', data.user)
-      setPassword('')
-      setActiveTab('login')
+      startVerification(data.email)
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -63,8 +107,7 @@ function App() {
     setLoading(true)
     try {
       const { data } = await http.post('/auth/login', { email, password })
-      setUser(data.user)
-      setPassword('')
+      startVerification(data.email)
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -81,7 +124,7 @@ function App() {
           </div>
         </header>
 
-        {!user && (
+        {!user && !pendingEmail && (
           <nav className="bg-[#2d2d37] flex justify-center text-sm font-semibold">
             <button
               onClick={() => switchTab('login')}
@@ -120,6 +163,54 @@ function App() {
               >
                 Log out
               </button>
+            </div>
+          ) : pendingEmail ? (
+            <div className="space-y-6">
+              <h1 className="text-3xl font-extrabold uppercase tracking-wide text-zinc-900">CHECK YOUR EMAIL</h1>
+              <hr className="border-zinc-300" />
+              <p className="text-sm text-zinc-700">
+                We sent a 6-digit code to <span className="font-semibold">{pendingEmail}</span>. It expires in 10 minutes.
+              </p>
+
+              <form onSubmit={handleVerify} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-zinc-700">Verification code</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="123456"
+                    autoFocus
+                    className="w-full px-4 py-3 rounded-lg border border-zinc-400 bg-white tracking-[0.5em] text-lg focus:outline-none focus:ring-2 focus:ring-[#e10600]"
+                  />
+                </div>
+
+                {error && (
+                  <p role="alert" className="text-sm font-medium text-red-600">
+                    {error}
+                  </p>
+                )}
+                {notice && <p className="text-sm font-medium text-green-700">{notice}</p>}
+
+                <div className="flex items-center gap-4">
+                  <button
+                    type="submit"
+                    disabled={loading || code.length !== 6}
+                    className="bg-[#e10600] hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded text-sm uppercase tracking-wider transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {loading ? 'Verifying...' : 'Verify'}
+                  </button>
+                  <button type="button" onClick={handleResend} className="text-sm text-zinc-600 hover:text-zinc-900 underline">
+                    Send a new code
+                  </button>
+                  <button type="button" onClick={cancelVerification} className="text-sm text-zinc-600 hover:text-zinc-900 underline">
+                    Back
+                  </button>
+                </div>
+              </form>
             </div>
           ) : activeTab === 'login' ? (
             <div className="space-y-6">

@@ -24,6 +24,8 @@ To check that everything works, open http://localhost:4000/api/health/db. It sho
 
 When someone adds a new migration, pull and run `npm run db:setup` again.
 
+Signing up and logging in email a 6-digit code. Not using a real email account yet. The server uses a temporary Ethereal inbox and prints a link to each email in its terminal (`[mail] Sent to ... view it at https://ethereal.email/...`)
+
 ## Server scripts
 - `npm run dev` - start the API (restarts on changes)
 - `npm run build` / `npm start` - build to `dist/` and run it

@@ -37,6 +37,13 @@ export const env = {
     database: readString("PGDATABASE", "fasttickets"),
     ssl: process.env.PGSSL?.trim().toLowerCase() === "true",
   },
+  smtp: {
+    host: process.env.SMTP_HOST?.trim() || undefined, // temporary Ethereal inbox
+    port: readPort("SMTP_PORT", 587),
+    user: readString("SMTP_USER", ""),
+    pass: readString("SMTP_PASS", ""),
+    from: readString("MAIL_FROM", "FastTickets <no-reply@fasttickets.local>"),
+  },
 } as const;
 
 export const isProduction = env.nodeEnv === "production";
