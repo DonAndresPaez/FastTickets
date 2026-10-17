@@ -49,8 +49,8 @@ async function main() {
       const eventData = await fetchEvent(url);
       results[url] = eventData;
       fs.writeFileSync(outputFilePath, JSON.stringify(results, null, 4));
-    } catch (error) {
-      console.error("Error fetching event data for URL:", url, error);
+    } catch (err) {
+      console.error("Error fetching event data for URL:", url, err);
     }
   } 
 
