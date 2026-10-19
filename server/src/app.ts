@@ -16,7 +16,7 @@ export function createApp(): express.Express {
   // add each subsystem's routes here, e.g. app.use("/api/auth", authRouter);
   app.use("/api/health", healthRouter);
   app.use("/api/auth", authRouter);
-  app.use("/races", raceRouter)
+  app.use("/api/races", raceRouter);
 
   app.use((_req, res) => {
     res.status(404).json({ error: "Not found" });

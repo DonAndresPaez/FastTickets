@@ -18,9 +18,10 @@ Runs on http://localhost:5173. Calls to `/api` get forwarded to the server on po
 3. npm install
 4. Copy `.env.example` to `.env` and put your PostgreSQL password in `PGPASSWORD`. Don't commit `.env`.
 5. npm run db:setup (creates the `fasttickets` database and runs the migrations)
-6. npm run dev
+6. npm run db:load (fills the database with the race and ticket data)
+7. npm run dev
 
-To check that everything works, open http://localhost:4000/api/health/db. It should say `"status": "ok"`.
+To check that everything works, open http://localhost:4000/api/health/db. It should say `"status": "ok"`. http://localhost:4000/api/races should list the races.
 
 When someone adds a new migration, pull and run `npm run db:setup` again.
 
@@ -32,7 +33,8 @@ Signing up and logging in email a 6-digit code. Not using a real email account y
 - `npm run typecheck` - check types
 - `npm run db:setup` - create the database if needed and run new migrations
 - `npm run db:migrate` - run new migrations only
-- `npm run db:reset` - wipe your local database and run all migrations again
+- `npm run db:reset` - wipe your local database and run all migrations again (run `db:load` after it)
+- `npm run db:load` - load the race and ticket data from `database/dummy/eventData.json`. Safe to run again
 
 ## Database notes
 - Use `query` and `withTransaction` from `server/src/db.ts` for all database calls.
