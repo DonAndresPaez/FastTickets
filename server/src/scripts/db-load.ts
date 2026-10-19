@@ -24,7 +24,8 @@ interface TicketData {
 }
 
 const filePath = path.resolve(__dirname, "../../database/dummy/eventData.json");
-const data: RaceData[] = JSON.parse(readFileSync(filePath, "utf-8"));
+// the file is an object keyed by StubHub URL, we only need the values
+const data: RaceData[] = Object.values(JSON.parse(readFileSync(filePath, "utf-8")) as Record<string, RaceData>);
 
 async function load() {
     await withTransaction(async (client) => {
