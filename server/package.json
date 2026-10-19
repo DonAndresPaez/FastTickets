@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "db:create": "tsx src/scripts/db-create.ts",
+    "db:load": "tsx src/scripts/db-load.ts",
     "db:migrate": "tsx src/scripts/migrate.ts",
     "db:setup": "npm run db:create && npm run db:migrate",
     "db:reset": "tsx src/scripts/db-reset.ts && npm run db:migrate",
