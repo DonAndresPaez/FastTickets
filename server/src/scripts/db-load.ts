@@ -3,25 +3,7 @@
 import path from "node:path";
 import { readFileSync } from "fs";
 import { withTransaction, describeDbError, closePool } from "../db";
-
-interface RaceData {
-    race: {
-        race_name: string;
-        city: string;
-        start_date: string;
-        end_date: string;
-    }
-    day: string;
-    body: {items: TicketData[]}
-}
-
-interface TicketData {
-    availableTickets: number;
-    rawPrice: number;
-    row?: string;
-    section: string;
-    ticketClassName: string;
-}
+import type { RaceData } from "../types/event";
 
 const filePath = path.resolve(__dirname, "../../database/dummy/eventData.json");
 // the file is an object keyed by StubHub URL, we only need the values
@@ -65,4 +47,4 @@ load()
     console.error(`[db:load] ${describeDbError(err)}`);
     process.exitCode = 1;
     })
-    .finally(() => closePool());
+    .finally(() => closePool());

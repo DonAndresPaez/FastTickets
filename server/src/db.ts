@@ -4,8 +4,13 @@ import {
   type PoolConfig,
   type QueryResult,
   type QueryResultRow,
+  types,
 } from "pg";
 import { env } from "./config/env";
+
+// return DATE columns as plain "YYYY-MM-DD" strings instead of JS Dates,
+// otherwise the timezone can shift race days by one
+types.setTypeParser(types.builtins.DATE, (value) => value);
 
 // All database access goes through this file.
 // Pass values as $1, $2, ... params, never by concatenating strings into the SQL. We do not want SQL injections. :)
