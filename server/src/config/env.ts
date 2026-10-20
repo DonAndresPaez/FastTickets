@@ -44,6 +44,11 @@ export const env = {
     pass: readString("SMTP_PASS", ""),
     from: readString("MAIL_FROM", "FastTickets <no-reply@fasttickets.local>"),
   },
+  // only needed by npm run db:fetch
+  ticketsData: {
+    user: readString("TICKETSDATA_USER", ""),
+    pass: readString("TICKETSDATA_PASS", ""),
+  },
 } as const;
 
 export const isProduction = env.nodeEnv === "production";
