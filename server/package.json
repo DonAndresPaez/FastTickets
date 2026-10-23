@@ -35,10 +35,12 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^22.20.2",
+    "@types/node": "^22.20.5",
     "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.23.1",
+    "node-mocks-http": "^1.18.1",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
   }
 }
