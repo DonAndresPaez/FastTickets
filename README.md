@@ -1,4 +1,5 @@
 # FastTickets
+
 This repository holds the code for the project FastTickets.
 
 - `client/` - React + Tailwind frontend
@@ -6,6 +7,7 @@ This repository holds the code for the project FastTickets.
 - PostgreSQL database (migrations in `server/database/migrations`)
 
 ## Frontend setup
+
 1. cd client
 2. npm install
 3. npm run dev
@@ -13,6 +15,7 @@ This repository holds the code for the project FastTickets.
 Runs on http://localhost:5173. Calls to `/api` get forwarded to the server on port 4000.
 
 ## Backend setup
+
 1. Install PostgreSQL 16 or newer (https://www.postgresql.org/download/). Keep port 5432 and remember the password you set.
 2. cd server
 3. npm install
@@ -28,6 +31,7 @@ When someone adds a new migration, pull and run `npm run db:setup` again.
 Signing up and logging in email a 6-digit code. Not using a real email account yet. The server uses a temporary Ethereal inbox and prints a link to each email in its terminal (`[mail] Sent to ... view it at https://ethereal.email/...`)
 
 ## Server scripts
+
 - `npm run dev` - start the API (restarts on changes)
 - `npm run build` / `npm start` - build to `dist/` and run it
 - `npm run typecheck` - check types
@@ -38,15 +42,18 @@ Signing up and logging in email a 6-digit code. Not using a real email account y
 - `npm run db:fetch` - refresh `eventData.json` from the TicketsData API (see below)
 
 ## Database notes
+
 - Use `query` and `withTransaction` from `server/src/db.ts` for all database calls.
 - Always pass values as `$1, $2...` params, e.g. `query("SELECT * FROM users WHERE email = $1", [email])`. Never put user input straight into the SQL string.
 - Use `withTransaction` when several writes need to succeed or fail together (like checkout).
 - Table changes go in a new migration file, e.g. `server/database/migrations/002_create_users.sql`. Don't edit a migration that's already been pushed, make a new one.
 
 ## Race and ticket data
+
 Ticket listings come from StubHub through the [TicketsData](https://ticketsdata.com) API. They're saved to `server/database/dummy/eventData.json`, so you only need the API to refresh them. `db:load` copies the file into the database.
 
 To refresh:
+
 1. Put the TicketsData login in `TICKETSDATA_USER` and `TICKETSDATA_PASS` in `server/.env`
 2. npm run db:fetch -- austin (a city or a day like `2026-10-23`). Leaving it out refreshes every race day
 3. npm run db:load
@@ -54,6 +61,12 @@ To refresh:
 Each race day costs one API call and the quota is small, so refresh only what you need. The race list and StubHub links are at the top of `server/src/scripts/db-fetch.ts`.
 
 Endpoints:
+
 - `GET /api/races` - all races, sorted by start date
 - `GET /api/races/:id` - one race
 - `GET /api/races/:id/tickets` - tickets for a race, add `?day=YYYY-MM-DD` for one day
+
+## Run Vitest Tests:
+
+1. cd server
+2. npx vitest
