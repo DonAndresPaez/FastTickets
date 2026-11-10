@@ -1,5 +1,6 @@
 import { useEffect, useState, type SubmitEvent } from 'react'
 import { http, getErrorMessage } from '../api/http'
+import Dashboard from '../Dashboard/Dashboard'
 import './App.css'
 
 interface User {
@@ -20,12 +21,11 @@ function App() {
   const [lastName, setLastName] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  // set once the password is accepted and a code has been emailed
   const [pendingEmail, setPendingEmail] = useState<string | null>(null)
   const [code, setCode] = useState('')
   const [notice, setNotice] = useState('')
 
-  // page load
+  // Check active session on load
   useEffect(() => {
     http
       .get('/auth/me')
@@ -115,16 +115,26 @@ function App() {
     }
   }
 
+  if (checkingSession) {
+    return null
+  }
+
+  if (user) {
+    return <Dashboard user={user} onLogout={handleLogout} />
+  }
+
   return (
     <div className="min-h-screen bg-[#f3f3f3] text-zinc-900 flex flex-col justify-between font-sans">
       <div>
-        <header className="bg-[#15151e] border-b border-zinc-800 px-6 py-4 flex items-center">
+        <header className="bg-[#15151e] border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-1">
-            <span><img src="../../public/logo.svg" width="130"></img></span>
+            <span>
+              <img src="../../public/logo.svg" width="130" alt="Logo" />
+            </span>
           </div>
         </header>
 
-        {!user && !pendingEmail && (
+        {!pendingEmail && (
           <nav className="bg-[#2d2d37] flex justify-center text-sm font-semibold">
             <button
               onClick={() => switchTab('login')}
@@ -150,21 +160,7 @@ function App() {
         )}
 
         <main className="max-w-xl mx-auto px-6 py-12">
-          {checkingSession ? null : user ? (
-            <div className="space-y-6">
-              <h1 className="text-3xl font-extrabold uppercase tracking-wide text-zinc-900">
-                Welcome, {user.firstName}
-              </h1>
-              <hr className="border-zinc-300" />
-              <p className="text-sm text-zinc-700">Signed in as {user.email}</p>
-              <button
-                onClick={handleLogout}
-                className="bg-[#e10600] hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded text-sm uppercase tracking-wider transition-colors"
-              >
-                Log out
-              </button>
-            </div>
-          ) : pendingEmail ? (
+          {pendingEmail ? (
             <div className="space-y-6">
               <h1 className="text-3xl font-extrabold uppercase tracking-wide text-zinc-900">CHECK YOUR EMAIL</h1>
               <hr className="border-zinc-300" />
