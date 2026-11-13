@@ -5,6 +5,8 @@ import { env } from "./config/env";
 import { healthRouter } from "./routes/health.routes";
 import { authRouter } from "./routes/auth.routes";
 import { raceRouter } from "./routes/races.routes";
+import { checkoutRouter } from "./routes/checkout.routes";
+import { ordersRouter } from "./routes/orders.routes";
 
 export function createApp(): express.Express {
   const app = express();
@@ -17,6 +19,8 @@ export function createApp(): express.Express {
   app.use("/api/health", healthRouter);
   app.use("/api/auth", authRouter);
   app.use("/api/races", raceRouter);
+  app.use("/api/checkout", checkoutRouter);
+  app.use("/api/orders", ordersRouter);
 
   app.use((_req, res) => {
     res.status(404).json({ error: "Not found" });

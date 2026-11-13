@@ -65,9 +65,10 @@ raceRouter.get("/:id/tickets", async (req, res, next) => {
             return;
         }
 
+        // sold out listings are left out
         const { rows } = day
-            ? await query<Ticket>("SELECT * FROM tickets WHERE race_id = $1 AND event_day = $2", [raceID, day])
-            : await query<Ticket>("SELECT * FROM tickets WHERE race_id = $1", [raceID]);
+            ? await query<Ticket>("SELECT * FROM tickets WHERE race_id = $1 AND event_day = $2 AND quantity > 0", [raceID, day])
+            : await query<Ticket>("SELECT * FROM tickets WHERE race_id = $1 AND quantity > 0", [raceID]);
 
         res.json(rows);
     } catch (err) {

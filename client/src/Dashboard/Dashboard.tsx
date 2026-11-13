@@ -6,6 +6,7 @@ interface User {
   firstName: string
   lastName: string
   email: string
+  balance: string
 }
 
 interface Race {
@@ -174,6 +175,9 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
           <div className="flex items-center gap-4 text-sm text-zinc-300">
             <span>
               Welcome, <strong className="text-white">{user.firstName}</strong>
+            </span>
+            <span>
+              Credits: <strong className="text-white">${user.balance}</strong>
             </span>
             <button
               onClick={onLogout}
