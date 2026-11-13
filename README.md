@@ -66,6 +66,17 @@ Endpoints:
 - `GET /api/races/:id` - one race
 - `GET /api/races/:id/tickets` - tickets for a race, add `?day=YYYY-MM-DD` for one day
 
+## Checkout
+
+Every account starts with $500 in credits (`users.balance`) since we are not processing real credit cards :) . All of these need you to be logged in.
+
+- `POST /api/checkout` - buy tickets. Body: `{ "items": [{ "ticketId": 12, "quantity": 2 }] }` (`quantity` defaults to 1). Returns the order and the new balance, and emails the receipt
+- `GET /api/orders` - your past orders with their tickets, newest first
+- `GET /api/orders/:id` - one order
+- `GET /api/auth/me` now also returns `balance`
+
+Checkout errors: 400 bad or empty cart, 402 not enough credits, 409 a ticket sold out.
+
 ## Run Vitest Tests:
 
 1. cd server

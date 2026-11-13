@@ -131,7 +131,7 @@ authRouter.post("/verify", async (req, res, next) => {
     const { rows } = await query(
       `UPDATE users SET email_verified_at = COALESCE(email_verified_at, NOW())
        WHERE id = $1
-       RETURNING id, first_name AS "firstName", last_name AS "lastName", email`,
+       RETURNING id, first_name AS "firstName", last_name AS "lastName", email, balance`,
       [pending.id],
     );
     if (!rows[0]) {
@@ -184,7 +184,7 @@ authRouter.post("/logout", (_req, res) => {
 authRouter.get("/me", requireAuth, async (req, res, next) => {
   try {
     const { rows } = await query(
-      `SELECT id, first_name AS "firstName", last_name AS "lastName", email
+      `SELECT id, first_name AS "firstName", last_name AS "lastName", email, balance
        FROM users
        WHERE id = $1`,
       [req.user!.id],
