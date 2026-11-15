@@ -36,7 +36,7 @@ async function releaseExpiredItems(client: any, cartId: number, ticketId: number
             RETURNING ticket_id, quantity
         ),
         totals AS (
-            SELECT ticket_id, SUM(quantity) AS quantity
+            SELECT ticket_id, SUM(quantity)::int AS quantity
             FROM expired
             GROUP BY ticket_id
         )
