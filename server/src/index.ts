@@ -1,6 +1,7 @@
 import { createApp } from "./app";
 import { env } from "./config/env";
 import { checkConnection, closePool, describeDbError } from "./db";
+import { startCartScheduler, stopCartScheduler } from "./jobs/cart.scheduler";
 
 async function start(): Promise<void> {
   try {
@@ -15,8 +16,11 @@ async function start(): Promise<void> {
     console.log(`[server] Listening on http://localhost:${env.port}`);
   });
 
+  startCartScheduler(); // will print error to console if db not connected, still works
+
   const shutdown = (signal: string) => {
     console.log(`[server] ${signal} received, shutting down`);
+    stopCartScheduler();
     server.close(() => {
       closePool().finally(() => process.exit(0));
     });

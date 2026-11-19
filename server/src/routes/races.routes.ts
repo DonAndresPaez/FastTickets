@@ -11,7 +11,7 @@ function isValidDay(day: string): boolean {
     return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === day;
 }
 
-// get races
+// GET /api/races  - get all races
 raceRouter.get("/", async (_req, res, next) => {
     try {
         const { rows } = await query<Race>("SELECT * FROM race ORDER BY start_date");
@@ -21,7 +21,7 @@ raceRouter.get("/", async (_req, res, next) => {
     }
 });
 
-// get one race
+// GET /api/races/:id  - get a single race by ID
 raceRouter.get("/:id", async (req, res, next) => {
     try {
         const raceID = Number(req.params.id);
@@ -43,7 +43,7 @@ raceRouter.get("/:id", async (req, res, next) => {
     }
 });
 
-// get tickets for a race, with optional day parameter for a single day (?day=YYYY-MM-DD)
+// GET /api/races/:id/tickets  - get tickets for a race, with optional day parameter for a single day (?day=YYYY-MM-DD)
 raceRouter.get("/:id/tickets", async (req, res, next) => {
     try {
         const raceID = Number(req.params.id);
