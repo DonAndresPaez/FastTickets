@@ -4,10 +4,13 @@ import { env, isProduction } from "../config/env";
 
 export const SESSION_COOKIE = "session";
 export const PENDING_COOKIE = "pending_login";
+export const ADMIN_COOKIE = "admin_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 7; // 7 days potentially change later
 const PENDING_SECONDS = 60 * 15;
+const ADMIN_SECONDS = 60 * 60 * 8; // admins get logged out after a work day
 
-type Audience = "session" | "pending";
+// the audience keeps the tokens apart, a user session can't be used as an admin one
+type Audience = "session" | "pending" | "admin";
 
 export interface AuthUser {
   id: string;
@@ -64,4 +67,17 @@ export function clearPendingCookie(res: Response): void {
 
 export function readPending(token: unknown): AuthUser | null {
   return readToken(token, "pending");
+}
+
+// admins log in separately from users, with their own cookie
+export function setAdminSessionCookie(res: Response, adminId: string): void {
+  setTokenCookie(res, ADMIN_COOKIE, "admin", adminId, ADMIN_SECONDS);
+}
+
+export function clearAdminSessionCookie(res: Response): void {
+  res.clearCookie(ADMIN_COOKIE, cookieOptions);
+}
+
+export function readAdminSession(token: unknown): AuthUser | null {
+  return readToken(token, "admin");
 }

@@ -24,21 +24,41 @@ vi.mock("../middleware/requireAuth", () => ({
 }));
 
 const user = { email: "squaredcircle42@yahoo.com", first_name: "Squared", balance: "500.00" };
+const cart = { id: 5 };
 const ticket = {
   id: 7,
   race_id: 1,
   race_name: "United States Grand Prix",
   city: "Austin",
   event_day: "2026-10-23",
-  quantity: 2,
   row: "4",
   section: "T9-4",
   price: "62.15",
   location: "Turn 9",
 };
+const gaTicket = { ...ticket, id: 8, row: null, section: "General Admission", price: "0.10", location: "General Admission" };
 
-async function checkout(body: unknown) {
-  const req = httpMocks.createRequest({ method: "POST", url: "/", body: body as Record<string, unknown> });
+// checkout runs its queries in this order:
+// user, cart, tickets, delete cart items, charge user, insert order, then one insert per order item
+function queueCheckout(opts: {
+  user?: object;
+  tickets: object[];
+  items: { ticket_id: number; quantity: number }[];
+  balance?: string;
+  order?: { id: string; total: string };
+}) {
+  client.query
+    .mockResolvedValueOnce({ rows: [opts.user ?? user] })
+    .mockResolvedValueOnce({ rows: [cart] })
+    .mockResolvedValueOnce({ rows: opts.tickets })
+    .mockResolvedValueOnce({ rows: opts.items })
+    .mockResolvedValueOnce({ rows: [{ balance: opts.balance ?? "0.00" }] })
+    .mockResolvedValueOnce({ rows: [{ ...(opts.order ?? { id: "10", total: "0.00" }), created_at: new Date() }] })
+    .mockResolvedValue({ rows: [] });
+}
+
+async function checkout(body: Record<string, unknown> = {}) {
+  const req = httpMocks.createRequest({ method: "POST", url: "/", body });
   const res = httpMocks.createResponse();
   const next = vi.fn();
   await checkoutRouter(req, res, next);
@@ -47,32 +67,40 @@ async function checkout(body: unknown) {
   return { res, next };
 }
 
+const sqlCalls = (text: string) => client.query.mock.calls.filter(([sql]) => String(sql).includes(text));
+
 describe("Checkout Tests", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     client.query.mockReset();
   });
 
-  it("should buy tickets, charge the user and send a confirmation email", async () => {
-    client.query
-      .mockResolvedValueOnce({ rows: [user] })
-      .mockResolvedValueOnce({ rows: [ticket] })
-      .mockResolvedValueOnce({ rows: [{ balance: "375.70" }] })
-      .mockResolvedValueOnce({ rows: [{ id: "10", total: "124.30", created_at: new Date() }] })
-      .mockResolvedValue({ rows: [] });
+  it("should buy the cart, charge the user and send a confirmation email", async () => {
+    queueCheckout({
+      tickets: [ticket],
+      items: [{ ticket_id: 7, quantity: 2 }],
+      balance: "375.70",
+      order: { id: "10", total: "124.30" },
+    });
 
-    const { res } = await checkout({ items: [{ ticketId: 7, quantity: 2 }] });
+    const { res } = await checkout();
 
     expect(res.statusCode).toBe(201);
     const data = res._getJSONData();
     expect(data.order.total).toBe("124.30");
     expect(data.order.items).toHaveLength(1);
+    expect(data.order.items[0]).toMatchObject({ raceName: "United States Grand Prix", quantity: 2, unitPrice: "62.15" });
     expect(data.balance).toBe("375.70");
     expect(data.emailSent).toBe(true);
 
     // the user was charged price x quantity
     expect(client.query).toHaveBeenCalledWith(expect.stringContaining("UPDATE users SET balance"), ["1", "124.30"]);
-    expect(client.query).toHaveBeenCalledWith(expect.stringContaining("UPDATE tickets SET quantity"), [7, 2]);
+    // the cart was emptied and the order item saved
+    expect(sqlCalls("DELETE FROM cart_items")[0]![1]).toEqual([5]);
+    expect(sqlCalls("INSERT INTO order_items")).toHaveLength(1);
+    // stock was already taken out when the tickets went into the cart
+    expect(sqlCalls("UPDATE tickets")).toHaveLength(0);
+
     expect(mailer.sendMail).toHaveBeenCalledWith(
       "squaredcircle42@yahoo.com",
       expect.stringContaining("#10"),
@@ -80,58 +108,100 @@ describe("Checkout Tests", () => {
     );
   });
 
+  it("should add up several cart items without rounding errors", async () => {
+    queueCheckout({
+      tickets: [ticket, gaTicket],
+      items: [
+        { ticket_id: 7, quantity: 1 },
+        { ticket_id: 8, quantity: 3 },
+      ],
+      balance: "437.55",
+      order: { id: "12", total: "62.45" },
+    });
+
+    const { res } = await checkout();
+
+    expect(res.statusCode).toBe(201);
+    // 62.15 + 3 x 0.10 = 62.45 exactly
+    expect(client.query).toHaveBeenCalledWith(expect.stringContaining("UPDATE users SET balance"), ["1", "62.45"]);
+    expect(sqlCalls("INSERT INTO order_items")).toHaveLength(2);
+    expect(res._getJSONData().order.items).toHaveLength(2);
+  });
+
   it("should still complete the order if the email fails", async () => {
     vi.mocked(mailer.sendMail).mockRejectedValueOnce(new Error("smtp down"));
-    client.query
-      .mockResolvedValueOnce({ rows: [user] })
-      .mockResolvedValueOnce({ rows: [ticket] })
-      .mockResolvedValueOnce({ rows: [{ balance: "437.85" }] })
-      .mockResolvedValueOnce({ rows: [{ id: "11", total: "62.15", created_at: new Date() }] })
-      .mockResolvedValue({ rows: [] });
+    queueCheckout({
+      tickets: [ticket],
+      items: [{ ticket_id: 7, quantity: 1 }],
+      balance: "437.85",
+      order: { id: "11", total: "62.15" },
+    });
 
-    const { res } = await checkout({ items: [{ ticketId: 7 }] });
+    const { res } = await checkout();
 
     expect(res.statusCode).toBe(201);
     expect(res._getJSONData().emailSent).toBe(false);
   });
 
   it("should reject the purchase when the user doesn't have enough credits", async () => {
-    client.query
-      .mockResolvedValueOnce({ rows: [{ ...user, balance: "100.00" }] })
-      .mockResolvedValueOnce({ rows: [ticket] });
+    queueCheckout({
+      user: { ...user, balance: "100.00" },
+      tickets: [ticket],
+      items: [{ ticket_id: 7, quantity: 2 }],
+    });
 
-    const { res } = await checkout({ items: [{ ticketId: 7, quantity: 2 }] });
+    const { res } = await checkout();
 
     expect(res.statusCode).toBe(402);
-    expect(client.query).toHaveBeenCalledTimes(2); // nothing was written
+    expect(res._getJSONData().error).toBe("Not enough credits for this purchase");
+    // nothing was charged or ordered, and the transaction rolls back the cart delete
+    expect(sqlCalls("UPDATE users")).toHaveLength(0);
+    expect(sqlCalls("INSERT INTO orders")).toHaveLength(0);
     expect(mailer.sendMail).not.toHaveBeenCalled();
   });
 
-  it("should reject tickets that are sold out or don't exist", async () => {
-    client.query.mockResolvedValueOnce({ rows: [user] }).mockResolvedValueOnce({ rows: [ticket] });
-    const soldOut = await checkout({ items: [{ ticketId: 7, quantity: 3 }] });
-    expect(soldOut.res.statusCode).toBe(409);
-
+  it("should reject a user who has never made a cart", async () => {
     client.query.mockResolvedValueOnce({ rows: [user] }).mockResolvedValueOnce({ rows: [] });
-    const missing = await checkout({ items: [{ ticketId: 99 }] });
-    expect(missing.res.statusCode).toBe(409);
+
+    const { res } = await checkout();
+
+    expect(res.statusCode).toBe(400);
+    expect(res._getJSONData().error).toBe("Cart is empty");
+    expect(client.query).toHaveBeenCalledTimes(2);
   });
 
-  it("should reject bad carts before touching the database", async () => {
-    const bodies = [
-      {},
-      { items: [] },
-      { items: [{ ticketId: "7 OR 1=1" }] },
-      { items: [{ ticketId: 7, quantity: 0 }] },
-      { items: [{ ticketId: 7, quantity: 1.5 }] },
-      { items: [{ ticketId: 7 }, { ticketId: 7 }] },
-      { items: [{ ticketId: 7, quantity: 31 }] },
-    ];
-    for (const body of bodies) {
-      const { res } = await checkout(body);
-      expect(res.statusCode).toBe(400);
-    }
-    expect(client.query).not.toHaveBeenCalled();
+  it("should reject a cart that is empty or only has expired items", async () => {
+    // expired items are filtered out by the queries, so both come back empty
+    queueCheckout({ tickets: [], items: [] });
+
+    const { res } = await checkout();
+
+    expect(res.statusCode).toBe(400);
+    expect(res._getJSONData().error).toBe("No items in cart");
+    expect(sqlCalls("UPDATE users")).toHaveLength(0);
+  });
+
+  it("should reject the order if a cart ticket is no longer available", async () => {
+    queueCheckout({ tickets: [], items: [{ ticket_id: 7, quantity: 1 }] });
+
+    const { res } = await checkout();
+
+    expect(res.statusCode).toBe(409);
+    expect(sqlCalls("UPDATE users")).toHaveLength(0);
+  });
+
+  it("should only buy what is in the cart, not what the request body says", async () => {
+    queueCheckout({
+      tickets: [ticket],
+      items: [{ ticket_id: 7, quantity: 1 }],
+      balance: "437.85",
+      order: { id: "13", total: "62.15" },
+    });
+
+    const { res } = await checkout({ items: [{ ticketId: 7, quantity: 30 }], total: "0.01" });
+
+    expect(res.statusCode).toBe(201);
+    expect(client.query).toHaveBeenCalledWith(expect.stringContaining("UPDATE users SET balance"), ["1", "62.15"]);
   });
 
   it("should write an itemized receipt", () => {

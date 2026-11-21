@@ -8,6 +8,7 @@ import { raceRouter } from "./routes/races.routes";
 import { cartRouter } from "./routes/cart.routes";
 import { checkoutRouter } from "./routes/checkout.routes";
 import { ordersRouter } from "./routes/orders.routes";
+import { adminRouter } from "./routes/admin.routes";
 
 export function createApp(): express.Express {
   const app = express();
@@ -23,6 +24,7 @@ export function createApp(): express.Express {
   app.use("/api/cart", cartRouter);
   app.use("/api/checkout", checkoutRouter);
   app.use("/api/orders", ordersRouter);
+  app.use("/api/admin", adminRouter);
 
   app.use((_req, res) => {
     res.status(404).json({ error: "Not found" });
