@@ -23,3 +23,10 @@ export function formatCountdown(ms: number): string {
   const seconds = totalSeconds % 60
   return `${minutes}:${seconds.toString().padStart(2, '0')}`
 }
+
+export function todayISO(): string {
+  const d = new Date()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${month}-${day}`
+}
