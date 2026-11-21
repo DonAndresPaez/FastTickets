@@ -5,10 +5,11 @@ import type { CartItem, CheckoutResponse, Race, Ticket, User } from '../types'
 import { formatDate } from '../utils/format'
 import CartView from '../Cart/CartView'
 import OrderConfirmation from '../Checkout/OrderConfirmation'
+import OrderHistory from '../Orders/OrderHistory'
 
 const MAX_CART_TICKETS = 30
 
-type View = 'races' | 'tickets' | 'cart' | 'confirmation'
+type View = 'races' | 'tickets' | 'cart' | 'confirmation' | 'orders'
 
 interface DashboardProps {
   user: User
@@ -25,6 +26,7 @@ export default function Dashboard({ user, onLogout, onBalanceChange }: Dashboard
   const [addingTicketId, setAddingTicketId] = useState<number | null>(null)
   const [cartNotice, setCartNotice] = useState('')
   const [lastOrder, setLastOrder] = useState<CheckoutResponse | null>(null)
+  const [ordersKey, setOrdersKey] = useState(0)
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCityFilter, setSelectedCityFilter] = useState('all')
@@ -141,6 +143,11 @@ export default function Dashboard({ user, onLogout, onBalanceChange }: Dashboard
     setView('races')
   }
 
+  const openOrders = () => {
+    setOrdersKey((k) => k + 1)
+    setView('orders')
+  }
+
   const leaveCart = () => {
     setRaceError('')
     if (selectedRace) {
@@ -230,6 +237,14 @@ export default function Dashboard({ user, onLogout, onBalanceChange }: Dashboard
               Credits: <strong className="text-white">${user.balance}</strong>
             </span>
             <button
+              onClick={openOrders}
+              className={`font-bold py-1.5 px-3 rounded text-xs uppercase tracking-wider transition-colors border ${
+                view === 'orders' ? 'border-white text-white' : 'border-zinc-600 text-zinc-200 hover:border-white hover:text-white'
+              }`}
+            >
+              My Orders
+            </button>
+            <button
               onClick={() => setView('cart')}
               aria-label={`Cart, ${cartCount} ticket${cartCount === 1 ? '' : 's'}`}
               className={`flex items-center gap-1.5 font-bold py-1.5 px-3 rounded text-xs uppercase tracking-wider transition-colors border ${
@@ -275,7 +290,10 @@ export default function Dashboard({ user, onLogout, onBalanceChange }: Dashboard
               balance={lastOrder.balance}
               emailSent={lastOrder.emailSent}
               onDone={goToRaces}
+              onViewOrders={openOrders}
             />
+          ) : view === 'orders' ? (
+            <OrderHistory key={ordersKey} onBrowse={goToRaces} />
           ) : view === 'tickets' && selectedRace ? (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
