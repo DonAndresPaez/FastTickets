@@ -1,41 +1,30 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { http, getErrorMessage } from '../api/http'
+import { addToCart, checkout, getCart, removeFromCart } from '../api/cart'
+import type { CartItem, CheckoutResponse, Race, Ticket, User } from '../types'
+import { formatDate } from '../utils/format'
+import CartView from '../Cart/CartView'
+import OrderConfirmation from '../Checkout/OrderConfirmation'
 
-interface User {
-  id: string
-  firstName: string
-  lastName: string
-  email: string
-  balance: string
-}
+const MAX_CART_TICKETS = 30
 
-interface Race {
-  id: number
-  race_name: string
-  city: string
-  start_date: string
-  end_date: string
-}
-
-interface Ticket {
-  id: number
-  race_id: number
-  event_day: string
-  quantity: number
-  row: string | null
-  section: string
-  price: string
-  location: string
-}
+type View = 'races' | 'tickets' | 'cart' | 'confirmation'
 
 interface DashboardProps {
   user: User
   onLogout: () => void
+  onBalanceChange: (balance: string) => void
 }
 
-export default function Dashboard({ user, onLogout }: DashboardProps) {
+export default function Dashboard({ user, onLogout, onBalanceChange }: DashboardProps) {
+  const [view, setView] = useState<View>('races')
   const [races, setRaces] = useState<Race[]>([])
   const [selectedRace, setSelectedRace] = useState<Race | null>(null)
+  const [cartItems, setCartItems] = useState<CartItem[]>([])
+  const [addQuantities, setAddQuantities] = useState<Record<number, number>>({})
+  const [addingTicketId, setAddingTicketId] = useState<number | null>(null)
+  const [cartNotice, setCartNotice] = useState('')
+  const [lastOrder, setLastOrder] = useState<CheckoutResponse | null>(null)
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCityFilter, setSelectedCityFilter] = useState('all')
@@ -48,16 +37,6 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
   const [sortField, setSortField] = useState<string | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>(null)
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return ''
-    const parts = dateString.split('-')
-    if (parts.length === 3) {
-      const [year, month, day] = parts
-      return `${month}/${day}/${year}`
-    }
-    return dateString
-  }
-
   useEffect(() => {
     setLoadingRaces(true)
     http
@@ -67,37 +46,108 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
       .finally(() => setLoadingRaces(false))
   }, [])
 
-  const handleSelectRace = async (race: Race) => {
-    setSelectedRace(race)
-    setSelectedDay('all')
-    setSelectedSectionFilter('all')
-    setSortField(null)
-    setSortDirection(null)
-    setLoadingTickets(true)
-    setRaceError('')
+  const refreshCart = useCallback(async () => {
     try {
-      const { data } = await http.get<Ticket[]>(`/races/${race.id}/tickets`)
-      setTickets(data)
-    } catch (err) {
-      setRaceError(getErrorMessage(err))
-    } finally {
-      setLoadingTickets(false)
+      setCartItems(await getCart())
+    } catch {
+      // keep the last known cart; the next action will surface any error
     }
-  }
+  }, [])
 
-  const handleDayChange = async (day: string) => {
-    setSelectedDay(day)
-    if (!selectedRace) return
-    setLoadingTickets(true)
-    setRaceError('')
+  useEffect(() => {
+    getCart()
+      .then(setCartItems)
+      .catch(() => undefined)
+  }, [])
+
+  const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
+
+  const loadTickets = async (race: Race, day: string, showSpinner = true) => {
+    if (showSpinner) setLoadingTickets(true)
     try {
-      const url = day === 'all' ? `/races/${selectedRace.id}/tickets` : `/races/${selectedRace.id}/tickets?day=${day}`
+      const url = day === 'all' ? `/races/${race.id}/tickets` : `/races/${race.id}/tickets?day=${day}`
       const { data } = await http.get<Ticket[]>(url)
       setTickets(data)
     } catch (err) {
       setRaceError(getErrorMessage(err))
     } finally {
-      setLoadingTickets(false)
+      if (showSpinner) setLoadingTickets(false)
+    }
+  }
+
+  const handleSelectRace = async (race: Race) => {
+    setSelectedRace(race)
+    setView('tickets')
+    setSelectedDay('all')
+    setSelectedSectionFilter('all')
+    setSortField(null)
+    setSortDirection(null)
+    setRaceError('')
+    setCartNotice('')
+    await loadTickets(race, 'all')
+  }
+
+  const handleDayChange = async (day: string) => {
+    setSelectedDay(day)
+    if (!selectedRace) return
+    setRaceError('')
+    await loadTickets(selectedRace, day)
+  }
+
+  const handleAddToCart = async (ticket: Ticket, quantity: number) => {
+    setRaceError('')
+    setCartNotice('')
+    setAddingTicketId(ticket.id)
+    try {
+      await addToCart(ticket.id, quantity)
+      setCartNotice(`Added ${quantity} ticket${quantity === 1 ? '' : 's'} (${ticket.section}) to your cart.`)
+      setAddQuantities((q) => ({ ...q, [ticket.id]: 1 }))
+      await refreshCart()
+      if (selectedRace) await loadTickets(selectedRace, selectedDay, false)
+    } catch (err) {
+      setRaceError(getErrorMessage(err))
+    } finally {
+      setAddingTicketId(null)
+    }
+  }
+
+  const handleRemoveFromCart = async (ticketId: number) => {
+    try {
+      await removeFromCart(ticketId)
+    } catch (err) {
+      throw new Error(getErrorMessage(err))
+    } finally {
+      await refreshCart()
+    }
+  }
+
+  const handleCheckout = async () => {
+    try {
+      const result = await checkout()
+      onBalanceChange(result.balance)
+      setLastOrder(result)
+      setCartItems([])
+      setView('confirmation')
+    } catch (err) {
+      await refreshCart()
+      throw new Error(getErrorMessage(err))
+    }
+  }
+
+  const goToRaces = () => {
+    setSelectedRace(null)
+    setCartNotice('')
+    setRaceError('')
+    setView('races')
+  }
+
+  const leaveCart = () => {
+    setRaceError('')
+    if (selectedRace) {
+      setView('tickets')
+      loadTickets(selectedRace, selectedDay, false)
+    } else {
+      setView('races')
     }
   }
 
@@ -180,6 +230,26 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
               Credits: <strong className="text-white">${user.balance}</strong>
             </span>
             <button
+              onClick={() => setView('cart')}
+              aria-label={`Cart, ${cartCount} ticket${cartCount === 1 ? '' : 's'}`}
+              className={`flex items-center gap-1.5 font-bold py-1.5 px-3 rounded text-xs uppercase tracking-wider transition-colors border ${
+                view === 'cart' ? 'border-white text-white' : 'border-zinc-600 text-zinc-200 hover:border-white hover:text-white'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                />
+              </svg>
+              Cart
+              {cartCount > 0 && (
+                <span className="bg-[#e10600] text-white rounded-full px-1.5 min-w-[1.25rem] text-center">{cartCount}</span>
+              )}
+            </button>
+            <button
               onClick={onLogout}
               className="bg-[#e10600] hover:bg-red-700 text-white font-bold py-1.5 px-4 rounded text-xs uppercase tracking-wider transition-colors"
             >
@@ -189,11 +259,28 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
         </header>
 
         <main className="max-w-6xl mx-auto px-6 py-8">
-          {selectedRace ? (
+          {view === 'cart' ? (
+            <CartView
+              items={cartItems}
+              races={races}
+              balance={user.balance}
+              onRemove={handleRemoveFromCart}
+              onCheckout={handleCheckout}
+              onBack={leaveCart}
+              onExpired={refreshCart}
+            />
+          ) : view === 'confirmation' && lastOrder ? (
+            <OrderConfirmation
+              order={lastOrder.order}
+              balance={lastOrder.balance}
+              emailSent={lastOrder.emailSent}
+              onDone={goToRaces}
+            />
+          ) : view === 'tickets' && selectedRace ? (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <button
-                  onClick={() => setSelectedRace(null)}
+                  onClick={goToRaces}
                   className="text-sm font-semibold text-[#e10600] hover:underline flex items-center gap-1"
                 >
                   &larr; Back to all races
@@ -263,6 +350,14 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
                   {raceError}
                 </p>
               )}
+              {cartNotice && (
+                <p className="text-sm font-medium text-green-700">
+                  {cartNotice}{' '}
+                  <button onClick={() => setView('cart')} className="underline font-semibold hover:text-green-900">
+                    View cart
+                  </button>
+                </p>
+              )}
 
               {loadingTickets ? (
                 <div className="text-center py-12 text-zinc-500 font-medium">Loading ticket listings...</div>
@@ -305,23 +400,57 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-zinc-200 text-sm">
-                        {sortedTickets.map((ticket) => (
-                          <tr key={ticket.id} className="hover:bg-zinc-50 transition-colors">
-                            <td className="py-3 px-4 font-semibold text-zinc-900">{ticket.section}</td>
-                            <td className="py-3 px-4 text-zinc-600">{ticket.row ? `Row ${ticket.row}` : 'General Admission'}</td>
-                            <td className="py-3 px-4 text-zinc-600">{formatDate(ticket.event_day)}</td>
-                            <td className="py-3 px-4 text-zinc-600">{ticket.quantity}</td>
-                            <td className="py-3 px-4 font-bold text-[#e10600]">${ticket.price}</td>
-                            <td className="py-3 px-4 text-right">
-                              <button
-                                onClick={() => alert(`Selected listing ID ${ticket.id} in section ${ticket.section} for $${ticket.price}`)}
-                                className="bg-zinc-900 hover:bg-zinc-800 text-white font-medium py-1.5 px-3 rounded text-xs uppercase tracking-wider transition-colors"
-                              >
-                                Select
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                        {sortedTickets.map((ticket) => {
+                          const maxQty = Math.min(ticket.quantity, MAX_CART_TICKETS - cartCount)
+                          const qty = Math.min(addQuantities[ticket.id] ?? 1, Math.max(maxQty, 1))
+                          const canAdd = maxQty >= 1 && addingTicketId === null
+                          return (
+                            <tr key={ticket.id} className="hover:bg-zinc-50 transition-colors">
+                              <td className="py-3 px-4 font-semibold text-zinc-900">{ticket.section}</td>
+                              <td className="py-3 px-4 text-zinc-600">{ticket.row ? `Row ${ticket.row}` : 'General Admission'}</td>
+                              <td className="py-3 px-4 text-zinc-600">{formatDate(ticket.event_day)}</td>
+                              <td className="py-3 px-4 text-zinc-600">{ticket.quantity}</td>
+                              <td className="py-3 px-4 font-bold text-[#e10600]">${ticket.price}</td>
+                              <td className="py-3 px-4 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={Math.max(maxQty, 1)}
+                                    value={qty}
+                                    disabled={maxQty < 1}
+                                    aria-label={`Quantity for ${ticket.section}`}
+                                    onChange={(e) => {
+                                      const n = Math.floor(Number(e.target.value))
+                                      if (!Number.isFinite(n)) return
+                                      const clamped = Math.min(Math.max(n, 1), Math.max(maxQty, 1))
+                                      setAddQuantities((q) => ({ ...q, [ticket.id]: clamped }))
+                                    }}
+                                    className="w-16 px-2 py-1 rounded border border-zinc-300 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#e10600] disabled:bg-zinc-100"
+                                  />
+                                  <button
+                                    onClick={() => handleAddToCart(ticket, qty)}
+                                    disabled={!canAdd}
+                                    title={
+                                      ticket.quantity < 1
+                                        ? 'Sold out'
+                                        : maxQty < 1
+                                          ? `Your cart is limited to ${MAX_CART_TICKETS} tickets`
+                                          : undefined
+                                    }
+                                    className="bg-zinc-900 hover:bg-zinc-800 text-white font-medium py-1.5 px-3 rounded text-xs uppercase tracking-wider transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    {addingTicketId === ticket.id
+                                      ? 'Adding...'
+                                      : ticket.quantity < 1
+                                        ? 'Sold out'
+                                        : 'Add to cart'}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>

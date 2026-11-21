@@ -1,15 +1,8 @@
 import { useEffect, useState, type SubmitEvent } from 'react'
 import { http, getErrorMessage } from '../api/http'
 import Dashboard from '../Dashboard/Dashboard'
+import type { User } from '../types'
 import './App.css'
-
-interface User {
-  id: string
-  firstName: string
-  lastName: string
-  email: string
-  balance: string
-}
 
 function App() {
   const [user, setUser] = useState<User | null>(null)
@@ -121,7 +114,13 @@ function App() {
   }
 
   if (user) {
-    return <Dashboard user={user} onLogout={handleLogout} />
+    return (
+      <Dashboard
+        user={user}
+        onLogout={handleLogout}
+        onBalanceChange={(balance) => setUser((u) => u && { ...u, balance })}
+      />
+    )
   }
 
   return (
